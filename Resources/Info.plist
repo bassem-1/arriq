@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>arriq</string>
+    <key>CFBundleDisplayName</key>
+    <string>arriq</string>
+    <key>CFBundleIdentifier</key>
+    <string>io.github.arriq</string>
+    <key>CFBundleExecutable</key>
+    <string>arriq</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleShortVersionString</key>
+    <string>__VERSION__</string>
+    <key>CFBundleVersion</key>
+    <string>__VERSION__</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>arriq wakes your speaker when you get home.</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>arriq talks to your lamp on your home network.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>arriq starts your playlist in spotify.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 arriq contributors. mit license.</string>
+</dict>
+</plist>
