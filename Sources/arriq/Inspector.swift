@@ -127,6 +127,12 @@ private struct DevicesTab: View {
             ForEach(DeviceKind.allCases, id: \.self) { kind in
                 deviceRow(kind)
             }
+            HStack(spacing: 0) {
+                TextButton(title: "all on", size: 11) { model.turnOnAll() }.padding(.leading, -6)
+                Spacer(minLength: 24)
+                TextButton(title: "all off", size: 11) { model.turnOffAll() }.padding(.trailing, -6)
+            }
+            .frame(height: Theme.row)
             Rectangle().fill(Theme.line).frame(height: 1).padding(.vertical, 8)
             controls(for: model.device)
         }
@@ -182,24 +188,24 @@ private struct DevicesTab: View {
                     .font(Theme.font(11)).foregroundColor(Theme.fg2)
                     .lineLimit(1)
             }
+            // the two most used actions, near the top; opposite verbs at opposite ends so a miss never flips it
+            HStack(spacing: 0) {
+                TextButton(title: "turn on") { model.turnOn(kind) }.padding(.leading, -6)
+                Spacer(minLength: 24)
+                TextButton(title: "turn off") { model.turnOff(kind) }.padding(.trailing, -6)
+            }
+            .frame(height: Theme.row)
+            // frequency of use: the lamp's live controls come before its arrival settings
+            if kind == .lamp { kindControls(kind) }
             SettingRow("on arrival") {
                 ArriqSwitch(isOn: enabledBinding(kind), label: "\(kind.uiTitle) on arrival")
             }
-            Group {
-                SliderRow(title: "delay", value: delayBinding(kind), range: 0...120, step: 5) {
-                    "\(Int($0)) s"
-                }
-                kindControls(kind)
+            SliderRow(title: "delay", value: delayBinding(kind), range: 0...120, step: 5) {
+                "\(Int($0)) s"
             }
             .opacity(setting.enabled ? 1 : 0.32)
             .disabled(!setting.enabled)
-
-            HStack(spacing: 8) {
-                TextButton(title: "test") { model.test(kind) }.padding(.leading, -6)
-                TextButton(title: "off") { model.turnOff(kind) }
-                Spacer()
-            }
-            .frame(height: Theme.row)
+            if kind != .lamp { kindControls(kind) }
         }
     }
 
@@ -215,8 +221,31 @@ private struct DevicesTab: View {
             SliderRow(title: "brightness", value: brightnessBinding, range: 1...100) {
                 "\(Int($0))"
             }
-            SliderRow(title: "warmth", value: kelvinBinding, range: 2000...9000, step: 100) {
-                "\(Int($0))k"
+            SettingRow("light") {
+                HStack(spacing: 6) {
+                    ForEach(Array(LampMode.allCases.enumerated()), id: \.element) { index, mode in
+                        if index > 0 { Text("·").font(Theme.font(11)).foregroundColor(Theme.dim) }
+                        TabLabel(title: mode.rawValue, selected: model.settings.lampMode == mode) {
+                            model.settings.lampMode = mode
+                        }
+                    }
+                }
+                .fixedSize()
+            }
+            if model.settings.lampMode == .white {
+                SliderRow(title: "warmth", value: kelvinBinding, range: 2000...9000, step: 100) {
+                    "\(Int($0))k"
+                }
+            } else {
+                // two-colour ui: the hue is named, never shown as a swatch
+                SliderRow(title: "color", value: hueBinding, range: 0...359) {
+                    LampColor.name(hue: Int($0))
+                }
+            }
+            if model.power(.lamp) != true {
+                Text("changes reach the lamp while it is on")
+                    .font(Theme.font(11)).foregroundColor(Theme.dim)
+                    .frame(height: 24, alignment: .leading)
             }
         case .speaker:
             SettingRow("address") {
@@ -278,6 +307,11 @@ private struct DevicesTab: View {
     private var musicVolumeBinding: Binding<Double> {
         Binding(get: { Double(model.settings.musicVolume) },
                 set: { model.settings.musicVolume = Int($0) })
+    }
+
+    private var hueBinding: Binding<Double> {
+        Binding(get: { Double(model.settings.lampHue) },
+                set: { model.settings.lampHue = Int($0) })
     }
 
     private var kelvinBinding: Binding<Double> {

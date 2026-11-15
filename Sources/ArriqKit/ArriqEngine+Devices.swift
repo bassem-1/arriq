@@ -53,6 +53,7 @@ extension ArriqEngine {
         if let hint = outcome.hint { appendLog(hint) }
         ArriqLog.drivers.info("\(String(describing: kind), privacy: .public) ok=\(outcome.ok, privacy: .public)")
         setStatus(kind, outcome.ok ? .done : .failed(Self.reason(outcome.text)))
+        if outcome.ok { snapshot.power[kind] = true }
         publish()
         if kind == .speaker, outcome.ok, settings.musicEnabled { runMusic(stamp: stamp) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in
@@ -93,6 +94,34 @@ extension ArriqEngine {
                     if let hint = o.hint { self.appendLog(hint) }
                 }
                 self.setStatus(kind, outcome.ok ? self.readiness(kind) : .failed(Self.reason(outcome.text)))
+                if outcome.ok { self.snapshot.power[kind] = false }
+                self.publish()
+            }
+        }
+    }
+
+    /// sends the current brightness and colour to the lamp, only while arriq knows it is on.
+    /// overlapping calls collapse: the newest settings win, older replies are dropped.
+    func adjustLampNow() {
+        guard snapshot.power[.lamp] == true else { return }
+        adjustStamp += 1
+        let stamp = adjustStamp
+        let used = settings
+        let dry = dryRun
+        Task {
+            let outcome = await LampDriver.adjust(settings: used, dryRun: dry)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.adjustStamp == stamp else { return }
+                if let ip = outcome.lampIP, ip != self.settings.lampIP {
+                    self.settings.lampIP = ip
+                    self.onSettingsChange?(self.settings)
+                }
+                // a drag sends many of these: log failures, keep successes out of the log
+                if !outcome.ok {
+                    self.appendLog(outcome.text)
+                    if let hint = outcome.hint { self.appendLog(hint) }
+                }
+                FileLog.write(outcome.text)
                 self.publish()
             }
         }

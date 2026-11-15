@@ -36,12 +36,10 @@ struct SceneView: View {
                 .animation(.easeOut(duration: 0.18), value: snap.phoneHome)
                 .animation(.easeOut(duration: 0.18), value: snap.macHome)
 
-                HStack(spacing: 28) {
+                HStack(spacing: 12) {
                     ForEach(DeviceKind.allCases, id: \.self) { kind in
-                        VStack(spacing: 6) {
-                            square(model.status(kind))
-                            Text(kind.uiTitle)
-                                .font(Theme.font(11)).foregroundColor(Theme.fg2)
+                        PowerSquare(title: kind.uiTitle, power: model.power(kind), status: model.status(kind)) {
+                            model.toggle(kind)
                         }
                     }
                 }
@@ -77,21 +75,6 @@ struct SceneView: View {
         return CGPoint(x: center.x + radius * CGFloat(cos(a)), y: center.y - radius * CGFloat(sin(a)))
     }
 
-    /// Outline while waiting, filled in as each device works, fully filled when done.
-    private func square(_ status: DeviceStatus) -> some View {
-        let fill: Color
-        switch status {
-        case .done: fill = Theme.fg
-        case .working: fill = Theme.fg2
-        default: fill = Color.clear
-        }
-        return RoundedRectangle(cornerRadius: 4)
-            .fill(fill)
-            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.line, lineWidth: 1))
-            .frame(width: 28, height: 28)
-            .animation(.easeOut(duration: 0.18), value: status)
-    }
-
     private func readout(_ snap: EngineSnapshot, now: Date) -> String {
         if let armed = snap.armedUntil, armed > now {
             return "armed · \(Fmt.countdown(armed.timeIntervalSince(now))) left"
@@ -115,5 +98,79 @@ private struct Chord: Shape {
         p.move(to: from)
         p.addQuadCurve(to: to, control: control)
         return p
+    }
+}
+
+/// One device as a power switch: filled = on, outline = off or unknown. Click toggles.
+/// Poses: rest, hover, pressed, working, on, failed. Motion only moves between these.
+private struct PowerSquare: View {
+    let title: String
+    let power: Bool?
+    let status: DeviceStatus
+    let action: () -> Void
+
+    @State private var hover = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var failed: Bool { if case .failed = status { return true } else { return false } }
+    private var working: Bool { status == .working }
+
+    private var fill: Color {
+        if working { return Theme.fg2 }
+        if power == true { return Theme.fg }
+        return hover ? Theme.wash : .clear
+    }
+
+    private var word: String {
+        if working { return "…" }
+        if failed { return "failed" }
+        switch power {
+        case .some(true): return "on"
+        case .some(false): return "off"
+        case .none: return "–"
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(fill)
+                    .overlay(RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(failed ? Theme.fg2 : Theme.line,
+                                      style: StrokeStyle(lineWidth: 1, dash: failed ? [3, 3] : [])))
+                    .frame(width: 28, height: 28)
+                Text(title).font(Theme.font(11)).foregroundColor(Theme.fg2)
+                Text(word).font(Theme.font(11)).foregroundColor(Theme.dim)
+            }
+            // fitts: the whole column (square, name, state) is the target, 76 wide
+            .frame(width: 76)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressPose(reduceMotion: reduceMotion))
+        .arriqFocus()
+        .onHover { hover = $0 }
+        // motion: slow-out · base 180 · the fill answers a real change in the device, not the click
+        .animation(reduceMotion ? .linear(duration: 0.18) : .easeOut(duration: 0.18), value: power)
+        // motion: slow-out · quick 120 · working shows the moment the command leaves
+        .animation(.easeOut(duration: 0.12), value: working)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(word)
+        .accessibilityHint(power == true ? "turns \(title) off" : "turns \(title) on")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// pressed pose: 0.96 scale, no wind-up (the press is the wind-up)
+private struct PressPose: ButtonStyle {
+    let reduceMotion: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
+            // motion: press · tap 80 · in on press, out on release
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }

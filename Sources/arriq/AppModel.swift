@@ -43,6 +43,14 @@ enum Fmt {
     private static func pad(_ n: Int) -> String { n < 10 ? "0\(n)" : "\(n)" }
 }
 
+/// The parts of the settings the lamp shows right now.
+private struct LampLook: Equatable {
+    var brightness: Int
+    var kelvin: Int
+    var mode: LampMode
+    var hue: Int
+}
+
 /// One model for the app delegate, popover, window and gadget, so no state is duplicated.
 @MainActor
 final class AppModel: ObservableObject {
@@ -96,6 +104,14 @@ final class AppModel: ObservableObject {
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { SettingsStore.save($0) }
             .store(in: &bag)
+        // live lamp: a drag sends at most one update per 120ms, and only while the lamp is on (engine checks)
+        $settings
+            .map { LampLook(brightness: $0.lampBrightness, kelvin: $0.lampKelvin, mode: $0.lampMode, hue: $0.lampHue) }
+            .removeDuplicates()
+            .dropFirst()
+            .throttle(for: .milliseconds(120), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] _ in self?.engine.adjustLamp() }
+            .store(in: &bag)
         // only a bundled arriq (one that ships the helper) manages the agent, so a `swift run` build never
         // touches the installed app's LaunchAgent
         if FileManager.default.isExecutableFile(atPath: AppModel.helperExecutable) {
@@ -143,9 +159,18 @@ final class AppModel: ObservableObject {
     static let helperExecutable = AfterQuit.helperExecutable(inApp: Bundle.main.bundlePath)
 
     func fireNow() { engine.fireNow() }
+    func turnOn(_ kind: DeviceKind) { engine.turnOn(kind) }
     func turnOff(_ kind: DeviceKind) { engine.turnOff(kind) }
+    func turnOnAll() { engine.turnOnAll() }
     func turnOffAll() { engine.turnOffAll() }
-    func test(_ kind: DeviceKind) { engine.test(kind) }
+
+    /// what arriq last switched the device to; nil = unknown since launch
+    func power(_ kind: DeviceKind) -> Bool? { snapshot.power[kind] }
+
+    /// the scene squares: on goes off, anything else (off, unknown) goes on
+    func toggle(_ kind: DeviceKind) {
+        if power(kind) == true { turnOff(kind) } else { turnOn(kind) }
+    }
     func testMusic() { engine.testMusic() }
     func sendTestSignal() { engine.sendTestSignal() }
 

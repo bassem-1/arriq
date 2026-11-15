@@ -16,6 +16,7 @@ public final class ArriqEngine: @unchecked Sendable {
     internal var ntfyFilter = NtfyFilter()
     internal var stamps: [DeviceKind: Int] = [:]
     internal var tokenSet = false
+    internal var adjustStamp = 0
     /// existence check for the smartthings token; a closure so a test can see whether start() asks
     internal var tokenProbe: @Sendable () -> Bool = { TokenStore.exists() }
     internal let dryRun: Bool
@@ -101,6 +102,24 @@ public final class ArriqEngine: @unchecked Sendable {
     /// switches one device off now, cancelling its pending arrival run
     public func turnOff(_ kind: DeviceKind) {
         stopDevice(kind)
+    }
+
+    /// switches one device on now, regardless of its on-arrival switch (the same run as an arrival, no delay)
+    public func turnOn(_ kind: DeviceKind) {
+        startDevice(kind, after: 0)
+        publish()
+    }
+
+    /// switches every device on now, no delays
+    public func turnOnAll() {
+        appendLog("all on")
+        for kind in DeviceKind.allCases { startDevice(kind, after: 0) }
+        publish()
+    }
+
+    /// live lamp brightness / colour, while the lamp is on
+    public func adjustLamp() {
+        adjustLampNow()
     }
 
     /// switches every device off now, whether or not it is used on arrival

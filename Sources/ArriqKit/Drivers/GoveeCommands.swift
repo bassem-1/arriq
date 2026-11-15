@@ -21,6 +21,24 @@ public enum GoveeCommand {
         ])
     }
 
+    /// colour: rgb channels, colour temperature zero
+    public static func color(r: Int, g: Int, b: Int) -> Data {
+        envelope(cmd: "colorwc", data: [
+            "color": ["r": clamp(r, 0, 255), "g": clamp(g, 0, 255), "b": clamp(b, 0, 255)],
+            "colorTemInKelvin": 0,
+        ])
+    }
+
+    /// the colour command for the lamp's current mode
+    public static func shade(_ s: Settings) -> Data {
+        switch s.lampMode {
+        case .white: return warmWhite(kelvin: s.lampKelvin)
+        case .color:
+            let c = LampColor.rgb(hue: s.lampHue)
+            return color(r: c.r, g: c.g, b: c.b)
+        }
+    }
+
     /// msg.data.ip from a scan reply
     public static func scanIP(from reply: Data) -> String? {
         guard let obj = try? JSONSerialization.jsonObject(with: reply) as? [String: Any],

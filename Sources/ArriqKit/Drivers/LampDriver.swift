@@ -45,13 +45,40 @@ public enum LampDriver {
         let commands = [
             GoveeCommand.turn(on: true),
             GoveeCommand.brightness(settings.lampBrightness),
-            GoveeCommand.warmWhite(kelvin: settings.lampKelvin),
+            GoveeCommand.shade(settings),
         ]
         for c in commands {
             sock.send(c, to: target, port: GoveeCommand.devicePort)
             Thread.sleep(forTimeInterval: 0.05)
         }
         return DeviceOutcome(ok: true, text: "lamp on · \(target)", lampIP: target)
+    }
+
+    /// live slider changes while the lamp is on: brightness and colour only, straight to the cached ip
+    /// (no 2 s liveness probe per drag); a scan only when no ip is known yet
+    public static func adjust(settings: Settings, dryRun: Bool) async -> DeviceOutcome {
+        await withCheckedContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async {
+                cont.resume(returning: blockingAdjust(settings: settings, dryRun: dryRun))
+            }
+        }
+    }
+
+    static func blockingAdjust(settings: Settings, dryRun: Bool) -> DeviceOutcome {
+        let what = settings.lampMode == .white ? "\(settings.lampKelvin)k" : LampColor.name(hue: settings.lampHue)
+        if dryRun {
+            return DeviceOutcome(ok: true, text: "dry run: lamp set · \(settings.lampBrightness) · \(what)")
+        }
+        guard let sock = UDPSocket(bindPort: GoveeCommand.replyPort) else {
+            return DeviceOutcome(ok: false, text: "lamp set failed · no socket")
+        }
+        guard let target = settings.lampIP ?? scan(sock) else {
+            return DeviceOutcome(ok: false, text: "lamp set failed · not found on this wifi", hint: lampHint)
+        }
+        sock.send(GoveeCommand.brightness(settings.lampBrightness), to: target, port: GoveeCommand.devicePort)
+        Thread.sleep(forTimeInterval: 0.05)
+        sock.send(GoveeCommand.shade(settings), to: target, port: GoveeCommand.devicePort)
+        return DeviceOutcome(ok: true, text: "lamp set · \(settings.lampBrightness) · \(what)", lampIP: target)
     }
 
     /// the cached ip when it still answers, else a fresh scan; nil when the lamp is not on this network

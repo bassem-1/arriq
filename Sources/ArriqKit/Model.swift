@@ -24,6 +24,11 @@ public struct DeviceSetting: Codable, Equatable, Sendable {
     }
 }
 
+/// white = colour temperature (warmth), color = a hue at full saturation
+public enum LampMode: String, Codable, CaseIterable, Sendable {
+    case white, color
+}
+
 public struct Settings: Codable, Equatable, Sendable {
     public var enabled: Bool
     public var lamp: DeviceSetting
@@ -31,6 +36,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var tv: DeviceSetting
     public var lampBrightness: Int       // 1...100
     public var lampKelvin: Int           // 2000...9000
+    public var lampMode: LampMode
+    public var lampHue: Int              // 0...359 degrees, used in color mode
     public var lampIP: String?           // cached after a lan scan
     public var speakerAddress: String    // classic bluetooth address, upper-case, colon separated
     public var smartThingsDeviceID: String?
@@ -58,6 +65,8 @@ public struct Settings: Codable, Equatable, Sendable {
         tv: DeviceSetting = DeviceSetting(enabled: true, delaySeconds: 4),
         lampBrightness: Int = 60,
         lampKelvin: Int = 2700,
+        lampMode: LampMode = .white,
+        lampHue: Int = 25,
         lampIP: String? = nil,
         speakerAddress: String = "",
         smartThingsDeviceID: String? = nil,
@@ -84,6 +93,8 @@ public struct Settings: Codable, Equatable, Sendable {
         self.tv = tv
         self.lampBrightness = min(max(lampBrightness, 1), 100)
         self.lampKelvin = min(max(lampKelvin, 2000), 9000)
+        self.lampMode = lampMode
+        self.lampHue = ((lampHue % 360) + 360) % 360
         self.lampIP = lampIP
         self.speakerAddress = speakerAddress
         self.smartThingsDeviceID = smartThingsDeviceID
@@ -106,7 +117,7 @@ public struct Settings: Codable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case enabled, lamp, speaker, tv, lampBrightness, lampKelvin, lampIP, speakerAddress
+        case enabled, lamp, speaker, tv, lampBrightness, lampKelvin, lampMode, lampHue, lampIP, speakerAddress
         case smartThingsDeviceID, phoneTopic, homeGatewayMAC, cooldownMinutes, pairWindowMinutes
         case gadgetEnabled, gadgetFloats, gadgetOrigin, gadgetAfterQuit, launchAtLogin
         case musicEnabled, spotifyLink, musicVolume, musicShuffle, tvSceneEnabled, tvSceneLink, tvIP
@@ -129,6 +140,8 @@ public struct Settings: Codable, Equatable, Sendable {
             tv: get(.tv, d.tv),
             lampBrightness: get(.lampBrightness, d.lampBrightness),
             lampKelvin: get(.lampKelvin, d.lampKelvin),
+            lampMode: get(.lampMode, d.lampMode),
+            lampHue: get(.lampHue, d.lampHue),
             lampIP: opt(.lampIP),
             speakerAddress: get(.speakerAddress, d.speakerAddress),
             smartThingsDeviceID: opt(.smartThingsDeviceID),
@@ -235,6 +248,8 @@ public struct EngineSnapshot: Equatable, Sendable {
     public var tv: DeviceStatus
     public var smartThingsTokenSet: Bool
     public var log: [LogLine]           // newest last, max 200
+    /// what arriq last switched each device to; missing = unknown (nothing sent since launch)
+    public var power: [DeviceKind: Bool] = [:]
 
     public static let initial = EngineSnapshot(
         phoneHome: nil, macHome: false, armedUntil: nil, listening: false, lastPhoneSignal: nil,
