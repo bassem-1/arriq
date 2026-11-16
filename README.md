@@ -1,109 +1,154 @@
-# arriq
+<p align="center">
+  <img src="docs/images/banner.png" alt="arriq: the room wakes up when you do." width="100%">
+</p>
 
-the room wakes up when you do.
+<p align="center">
+  <b>walk in. the lamp is on, the speaker is playing, the tv is up.</b><br>
+  a small macos menu bar app that sets up your room the moment you get home.
+</p>
 
-arriq is a macos menu bar app. when you get home it turns on your lamp, your speaker and your tv, so the room is ready before you reach the door. it looks and works like its sibling app haptyq.
+<p align="center">
+  macos 13+ · menu bar · free · mit license
+</p>
 
-## what it does
+---
 
-- **arrival**: your phone posts `arrived` when its geofence says you are home. if your mac is already on your home network, arriq fires right away. the first start adopts the current network as home; change it in the home tab.
-- **pairing**: if the mac is not home yet, arriq waits a short window (adjustable under phone) for the laptop to join your network, then fires.
-- **devices**
-  - lamp: a govee h6076 on your local network, over udp. turned on, with brightness and warmth set.
-  - speaker: a ue boom 3, woken over bluetooth low energy and connected classically.
-  - tv: a samsung tv through the smartthings cloud.
+## how it feels
 
-each device can have its own delay, and every attempt is written to the log.
+you leave work. your phone notices when you reach home and quietly tells arriq. your mac is already on the home
+wi-fi, so arriq knows it is really you, and the room comes on in sequence: the lamp first, then the speaker, then
+the tv. no app to open, nothing to tap.
 
-## requirements
+<p align="center">
+  <img src="docs/images/popover.png" alt="the arriq menu: phone and laptop, three devices, fire now and all off" width="300">
+</p>
 
-- macos 13 or later.
-- bluetooth, and a home network with your lamp on it. on the lamp, govee home › lamp › settings › lan control must be on.
-- for the tv: a smartthings account with a personal access token.
-- for arrival: an ios or android phone that can send an http post when it enters or leaves an area.
+## what you can do
 
-## install
+| | |
+|---|---|
+| **arrive home** | lamp, speaker and tv switch on by themselves, each after its own delay. |
+| **turn anything on or off** | click a device square, or use `all on` / `all off`. off also works while arriq is paused. |
+| **set the light** | brightness, and either warm white (2000–9000k) or a colour. changes reach the lamp live while it is on. |
+| **start the music** | the speaker becomes the mac's output and your spotify playlist starts. |
+| **start the tv** | optionally opens a youtube video once the tv is on. |
+| **keep it on the desktop** | a small gadget shows `home`, `away` or `armed`. it stays even after you quit arriq: click it to start arriq again. |
 
-1. download `arriq-<version>.zip` from the latest release and unzip it.
-2. move `arriq.app` to `/applications`.
-3. open it for the first time (see below).
+<p align="center">
+  <img src="docs/images/window.png" alt="the arriq window: the home ring, device switches and lamp controls" width="620">
+</p>
 
-### first open for ad-hoc builds
+## what you need
 
-release builds are signed ad-hoc, not with an apple developer identity, so gatekeeper will ask once.
+- a mac with **macos 13** or later.
+- any of these, you don't need all three:
+  - **lamp**: a govee h6076 on your wi-fi, with *lan control* switched on in govee home › lamp › settings.
+  - **speaker**: an ultimate ears boom 3.
+  - **tv**: a samsung tv in your smartthings account.
+- for the automatic part: an **iphone** (shortcuts) or **android** phone (tasker, macrodroid…).
 
-- macos 15 or later: try to open it, then go to system settings › privacy & security and click "open anyway".
-- macos 13 or 14: right-click `arriq.app`, choose "open", then confirm.
-- or run `xattr -dr com.apple.quarantine /Applications/arriq.app` in terminal.
+## get started
 
-### grant bluetooth and local network
+**1 · install**
 
-arriq asks for two permissions the first time it needs them:
+build it with one command (see [build from source](#build-from-source)), then move `dist/arriq.app` to
+*applications*. when a ready-made build is published under [releases](../../releases), you can download that instead.
+
+arriq isn't signed by an apple developer account, so the first time macos asks you to confirm:
+
+- **macos 15 and later**: open it once, then system settings › privacy & security › *open anyway*.
+- **macos 13–14**: right-click `arriq.app` › *open* › *open*.
+
+**2 · let it in**
+
+the first time it needs them, arriq asks for:
 
 - **bluetooth**: to wake the speaker.
-- **local network**: to find and talk to the lamp.
+- **local network**: to reach the lamp.
+- **keychain**: to read your smartthings token. choose *always allow*.
+- **background item** (*arriq gadget*): keeps the gadget on the desktop after you quit.
 
-if you denied one, turn it on in system settings › privacy & security, then reopen arriq. ad-hoc builds are not tied to a developer identity, so macos may ask again after an update. toggle arriq off and on in that pane.
+arriq never asks for your location.
 
-## phone setup
+**3 · tell it which wi-fi is home**
 
-arriq listens on a private ntfy.sh topic. your phone posts two words to it: `arrived` and `left`. pick a long random topic name (for example, 20 random letters), enter it in arriq under phone, and keep it secret: anyone who knows the topic can post to it.
+open arriq at home. it takes your current network as home on its own; you can change it under **home**.
 
-the arriq window shows the exact url and body for each event under phone, ready to copy.
+**4 · link your phone**
 
-**ios (shortcuts)**
+open the **phone** tab. it shows two lines, one for *arrive* and one for *leave*, each with a **copy** button.
 
-1. open shortcuts › automation › new, choose "arrive" and pick your home area.
-2. add "get contents of url": url is your topic url, method post, request body json, add a new field: text, key `a`, value `arrived`.
-3. turn off "ask before running". repeat with "leave" and the value `left`.
-4. arriq also accepts a plain text body.
+<details>
+<summary><b>iphone · shortcuts</b></summary>
 
-**android (tasker, macrodroid or similar)**
+1. shortcuts › automation › **+** › *arrive*, and pick your home.
+2. add **get contents of url**. paste the *arrive* url, method **post**, request body **text**: `arrived`.
+3. switch on *run immediately*.
+4. do the same with *leave* and the body `left`.
 
-1. create a location profile for home, entering and leaving.
-2. add an http request action: post to your topic url, body `arrived` on enter, `left` on exit.
+</details>
 
-after a test run, the phone tab in arriq shows `heard from phone` with the time.
+<details>
+<summary><b>android · tasker, macrodroid or similar</b></summary>
 
-## smartthings token
+1. make a location trigger for home, on enter and on exit.
+2. add an http request: **post** to the url from arriq, body `arrived` on enter, `left` on exit.
 
-1. in your smartthings account, create a personal access token.
-2. open arriq › devices › tv, paste the token into `smartthings token` and press `save`.
-3. press `pick your tv` to choose the device.
+</details>
 
-the token is stored in the macos keychain. it is never written to settings or to the log.
+press **send test signal**. when arriq says *heard from phone*, you're linked.
 
-new smartthings tokens expire after 24 hours. if the tv fails with `token expired`, paste a fresh one.
+**5 · add your devices**
 
-## music
+open the **devices** tab and pick a device.
 
-open arriq › devices › speaker, turn on `play music`, paste a spotify playlist, album or track link, and set the volume and shuffle. when the speaker turns on, arriq makes it the mac's audio output and starts the link in the spotify app. the first time, macos asks to let arriq control spotify; if you said no, allow it in system settings › privacy › automation › arriq.
+- **lamp**: nothing to set up. arriq finds it on your wi-fi.
+- **speaker**: paste its bluetooth address (system settings › bluetooth › ⓘ next to the speaker).
+- **tv**: create a [smartthings personal access token](https://account.smartthings.com/tokens), paste it, press **save**,
+  then **pick your tv**. new tokens last 24 hours; if the tv says *token expired*, paste a fresh one.
 
-## tv scene
+press **turn on** on each one to try it.
 
-open arriq › devices › tv, turn on `tv scene` and paste a youtube link. after the tv turns on, arriq starts the video. adding the `tv address` (the tv's ip on your network) makes this reliable; without it arriq only opens the youtube app.
+## good to know
+
+- **only you can trigger it.** your phone posts to a private, random address that arriq makes for you. keep it to
+  yourself: anyone who has it could post *arrived*.
+- **it waits for your laptop.** if your phone gets home before your mac does, arriq waits a few minutes (adjustable)
+  for the mac to join the home wi-fi, then fires.
+- **it won't fire twice.** after an arrival there's a cooldown (30 minutes by default).
+- **pause it any time** with the switch at the top of the menu.
+- **everything is logged** under **log**, in plain words.
 
 ## privacy
 
-the phone never sends location. it only posts the words `arrived` or `left` to your secret ntfy.sh topic. arriq detects home by reading the mac's default gateway and its hardware address, which needs no location permission. nothing leaves your mac except the requests to the lamp, the speaker, smartthings and the ntfy.sh topic.
+your phone never shares where you are. it only sends the word `arrived` or `left`. arriq knows the mac is home by
+looking at which router it's connected to, which needs no location permission. your smartthings token stays in the
+macos keychain and is never written to a file or the log. nothing leaves your mac except the messages to your lamp,
+speaker, smartthings and your private ntfy.sh address.
 
 ## build from source
 
-arriq is a swift package. with the command line tools installed (`xcode-select --install`):
+you need the command line tools (`xcode-select --install`), nothing else.
 
-    git clone <this repository url>
-    cd arriq
-    scripts/bundle.sh
-    open dist/arriq.app
+```sh
+git clone https://github.com/bassem-1/arriq.git
+cd arriq
+scripts/bundle.sh          # builds dist/arriq.app and a zip
+open dist/arriq.app
+```
 
-to run the tests:
+```sh
+swift test                 # the test suite, no devices touched
+ARRIQ_DRY_RUN=1 swift run  # run without touching any device
+```
 
-    swift test
+apps you build yourself aren't quarantined, so macos won't ask you to confirm them.
 
-add `--debug` to `scripts/bundle.sh` for a debug build. the output is `dist/arriq.app` and `dist/arriq-<version>.zip`. the version lives in `VERSION` at the repo root.
+## family
 
-apps you build yourself are not quarantined, so gatekeeper will not block them.
+arriq has two siblings with the same look: **haptyq** (haptics that tell you where you are) and **gestyq**
+(gestures for your mac).
 
 ## license
 
-mit. see [license](LICENSE).
+[mit](LICENSE).
