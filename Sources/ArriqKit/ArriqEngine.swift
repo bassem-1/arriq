@@ -17,6 +17,8 @@ public final class ArriqEngine: @unchecked Sendable {
     internal var stamps: [DeviceKind: Int] = [:]
     internal var tokenSet = false
     internal var adjustStamp = 0
+    internal var hueKeySet = false
+    internal var hueKeyProbe: @Sendable () -> Bool = { TokenStore.exists(TokenStore.hue) }
     /// existence check for the smartthings token; a closure so a test can see whether start() asks
     internal var tokenProbe: @Sendable () -> Bool = { TokenStore.exists() }
     internal let dryRun: Bool
@@ -63,12 +65,15 @@ public final class ArriqEngine: @unchecked Sendable {
     /// keychain existence check on a background queue; it never prompts and never blocks the main thread
     func checkToken() {
         let probe = tokenProbe
+        let hueProbe = hueKeyProbe
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let present = probe()
+            let hue = hueProbe()
             DispatchQueue.main.async {
                 guard let self else { return }
-                FileLog.write("token check · present \(present)")
+                FileLog.write("token check · present \(present) · hue key \(hue)")
                 self.tokenSet = present
+                self.hueKeySet = hue
                 self.refreshReadiness()
                 self.publish()
             }
@@ -158,6 +163,40 @@ public final class ArriqEngine: @unchecked Sendable {
                 self.publish()
             }
         }
+    }
+
+    // MARK: hue
+
+    public func findHueBridges() async -> [String] {
+        if dryRun { return ["192.0.2.10"] }  // documentation address, never a real bridge
+        return await HueDiscovery.find()
+    }
+
+    public func hueBridgeName(ip: String) async -> String? {
+        if dryRun { return "hue bridge" }
+        return await HueDriver.bridgeName(ip: ip)
+    }
+
+    /// asks the bridge for a key; on success the key goes straight into the keychain and never comes back out here
+    public func pairHue(ip: String) async -> HuePair {
+        let result: HuePair = dryRun ? .key("dry-run") : await HueDriver.pair(ip: ip)
+        guard case .key(let key) = result else { return result }
+        let saved = dryRun ? true : await withCheckedContinuation { cont in
+            DispatchQueue.global(qos: .utility).async { cont.resume(returning: TokenStore.save(key, account: TokenStore.hue)) }
+        }
+        hueKeySet = saved
+        FileLog.write("hue pair · key stored \(saved)")
+        appendLog(saved ? "hue bridge paired" : "hue pair failed · keychain")
+        refreshReadiness()
+        publish()
+        return saved ? .key("") : .failed("keychain refused the key")  // the key itself never leaves the engine
+    }
+
+    public func listHueTargets() async -> [HueTarget] {
+        if dryRun { return [HueTarget(id: "group:1", label: "living room"), HueTarget(id: "light:1", label: "desk lamp")] }
+        guard let ip = settings.hueBridgeIP else { return [] }
+        guard case .token(let key) = await HueDriver.readKey() else { return [] }
+        return await HueDriver.targets(ip: ip, key: key)
     }
 
     public func listSmartThingsDevices() async -> [SmartThingsDevice] {
@@ -283,6 +322,7 @@ public final class ArriqEngine: @unchecked Sendable {
         snapshot.armedUntil = presence.armedUntil
         snapshot.lastTrigger = presence.lastTrigger
         snapshot.smartThingsTokenSet = tokenSet
+        snapshot.hueKeySet = hueKeySet
         onChange?(snapshot)
     }
 
@@ -344,9 +384,12 @@ public final class ArriqEngine: @unchecked Sendable {
 
     func refreshReadiness() {
         snapshot.smartThingsTokenSet = tokenSet
-        switch snapshot.tv {
-        case .ready, .notSetUp: setStatus(.tv, readiness(.tv))
-        default: break
+        snapshot.hueKeySet = hueKeySet
+        for kind in [DeviceKind.tv, .lamp] {
+            switch status(kind) {
+            case .ready, .notSetUp: setStatus(kind, readiness(kind))
+            default: break
+            }
         }
     }
 }

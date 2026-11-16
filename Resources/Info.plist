@@ -31,7 +31,11 @@
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>arriq wakes your speaker when you get home.</string>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>arriq talks to your lamp on your home network.</string>
+    <string>arriq talks to your lamp and your hue bridge on your home network.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_hue._tcp</string>
+    </array>
     <key>NSAppleEventsUsageDescription</key>
     <string>arriq starts your playlist in spotify.</string>
     <key>NSAppTransportSecurity</key>

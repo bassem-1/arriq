@@ -25,9 +25,18 @@ extension ArriqEngine {
         }
     }
 
+    /// why this device cannot run with these settings; nil when it can
+    func notSetUp(_ kind: DeviceKind, _ s: Settings) -> String? {
+        switch kind {
+        case .tv: return TVDriver.notSetUpReason(settings: s, tokenSet: tokenSet)
+        case .lamp: return s.lampBrand == .hue ? HueDriver.notSetUpReason(settings: s, keySet: hueKeySet) : nil
+        case .speaker: return nil
+        }
+    }
+
     func runDevice(_ kind: DeviceKind, stamp: Int, settings used: Settings) {
-        if let reason = TVDriver.notSetUpReason(settings: used, tokenSet: tokenSet), kind == .tv {
-            appendLog("tv skipped · \(reason)")
+        if let reason = notSetUp(kind, used) {
+            appendLog("\(kind.rawValue) skipped · \(reason)")
             setStatus(kind, .notSetUp(reason))
             publish()
             return
@@ -69,8 +78,8 @@ extension ArriqEngine {
         let stamp = (stamps[kind] ?? 0) + 1
         stamps[kind] = stamp
         let used = settings
-        if kind == .tv, let reason = TVDriver.notSetUpReason(settings: used, tokenSet: tokenSet) {
-            appendLog("tv off skipped · \(reason)")
+        if let reason = notSetUp(kind, used) {
+            appendLog("\(kind.rawValue) off skipped · \(reason)")
             setStatus(kind, .notSetUp(reason))
             publish()
             return
@@ -109,7 +118,9 @@ extension ArriqEngine {
         let used = settings
         let dry = dryRun
         Task {
-            let outcome = await LampDriver.adjust(settings: used, dryRun: dry)
+            let outcome = used.lampBrand == .hue
+                ? await HueDriver.adjust(settings: used, dryRun: dry)
+                : await LampDriver.adjust(settings: used, dryRun: dry)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.adjustStamp == stamp else { return }
                 if let ip = outcome.lampIP, ip != self.settings.lampIP {
@@ -129,7 +140,10 @@ extension ArriqEngine {
 
     static func offDriver(_ kind: DeviceKind, settings: Settings, dryRun: Bool) async -> DeviceOutcome {
         switch kind {
-        case .lamp: return await LampDriver.off(settings: settings, dryRun: dryRun)
+        case .lamp:
+            return settings.lampBrand == .hue
+                ? await HueDriver.off(settings: settings, dryRun: dryRun)
+                : await LampDriver.off(settings: settings, dryRun: dryRun)
         case .speaker: return await SpeakerDriver.off(settings: settings, dryRun: dryRun)
         case .tv: return await TVDriver.off(settings: settings, dryRun: dryRun)
         }
@@ -153,7 +167,10 @@ extension ArriqEngine {
 
     static func driver(_ kind: DeviceKind, settings: Settings, dryRun: Bool) async -> DeviceOutcome {
         switch kind {
-        case .lamp: return await LampDriver.run(settings: settings, dryRun: dryRun)
+        case .lamp:
+            return settings.lampBrand == .hue
+                ? await HueDriver.run(settings: settings, dryRun: dryRun)
+                : await LampDriver.run(settings: settings, dryRun: dryRun)
         case .speaker: return await SpeakerDriver.run(settings: settings, dryRun: dryRun)
         case .tv: return await TVDriver.run(settings: settings, dryRun: dryRun)
         }
@@ -165,10 +182,7 @@ extension ArriqEngine {
     }
 
     func readiness(_ kind: DeviceKind) -> DeviceStatus {
-        if kind == .tv, let reason = TVDriver.notSetUpReason(settings: settings, tokenSet: tokenSet) {
-            return .notSetUp(reason)
-        }
-        return .ready
+        notSetUp(kind, settings).map(DeviceStatus.notSetUp) ?? .ready
     }
 
     func status(_ kind: DeviceKind) -> DeviceStatus {

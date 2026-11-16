@@ -158,7 +158,7 @@ private struct DevicesTab: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(model.device == kind ? .isSelected : [])
 
-            if kind == .lamp, failedReason(model.status(kind)) != nil {
+            if kind == .lamp, model.settings.lampBrand == .govee, failedReason(model.status(kind)) != nil {
                 lampHelp
             }
         }
@@ -218,6 +218,18 @@ private struct DevicesTab: View {
     @ViewBuilder private func kindControls(_ kind: DeviceKind) -> some View {
         switch kind {
         case .lamp:
+            SettingRow("brand") {
+                HStack(spacing: 6) {
+                    ForEach(Array(LampBrand.allCases.enumerated()), id: \.element) { index, brand in
+                        if index > 0 { Text("·").font(Theme.font(11)).foregroundColor(Theme.dim) }
+                        TabLabel(title: brand.rawValue, selected: model.settings.lampBrand == brand) {
+                            model.settings.lampBrand = brand
+                        }
+                    }
+                }
+                .fixedSize()
+            }
+            if model.settings.lampBrand == .hue { HueControls(model: model) }
             SliderRow(title: "brightness", value: brightnessBinding, range: 1...100) {
                 "\(Int($0))"
             }
@@ -421,6 +433,117 @@ private struct TVControls: View {
         Task {
             let list = await model.listSmartThingsDevices()
             devices = list
+            loading = false
+        }
+    }
+}
+
+/// philips hue: the bridge (found on the local network or typed), one-time pairing, then a room or light.
+/// the key the bridge hands out goes straight to the keychain; this view never sees it.
+private struct HueControls: View {
+    @ObservedObject var model: AppModel
+    @State private var found: [(ip: String, name: String)] = []
+    @State private var finding = false
+    @State private var pairing = false
+    @State private var pairNote: String?
+    @State private var targets: [HueTarget] = []
+    @State private var loading = false
+
+    private var note: String {
+        if let pairNote { return pairNote }
+        if model.settings.hueBridgeIP == nil { return "find your bridge, or type its address" }
+        return model.snapshot.hueKeySet ? "paired" : "press the round button on the bridge, then pair"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingRow("bridge") {
+                HStack(spacing: 8) {
+                    TextField("192.168.x.x", text: bridgeBinding).arriqField()
+                    TextButton(title: finding ? "finding…" : "find", size: 11) { find() }
+                }
+            }
+            ForEach(found, id: \.ip) { b in
+                HStack {
+                    TextButton(title: "\(b.name) · \(b.ip)", size: 11,
+                               color: model.settings.hueBridgeIP == b.ip ? Theme.fg : Theme.fg2) {
+                        model.settings.hueBridgeIP = b.ip
+                        pairNote = nil
+                    }
+                    .padding(.leading, -6)
+                    Spacer()
+                }
+            }
+            HStack(spacing: 0) {
+                Text(note).font(Theme.font(11)).foregroundColor(Theme.fg2).lineLimit(2)
+                Spacer(minLength: 8)
+                TextButton(title: pairing ? "pairing…" : "pair", size: 11) { pair() }
+                    .padding(.trailing, -6)
+                    .disabled(model.settings.hueBridgeIP == nil || pairing)
+            }
+            .frame(minHeight: Theme.row)
+            HStack {
+                TextButton(title: loading ? "loading…" : "pick your light", size: 11) { load() }
+                    .padding(.leading, -6)
+                    .disabled(!model.snapshot.hueKeySet)
+                Spacer()
+            }
+            .frame(height: Theme.row)
+            ForEach(targets) { t in
+                HStack {
+                    TextButton(title: t.id.hasPrefix("group:") ? "\(t.label) · room" : t.label, size: 11,
+                               color: model.settings.hueTarget == t.id ? Theme.fg : Theme.fg2) {
+                        model.settings.hueTarget = t.id
+                    }
+                    .padding(.leading, -6)
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    /// postel: spaces trimmed; anything typed is kept, only a full ipv4 address is used to talk to the bridge
+    private var bridgeBinding: Binding<String> {
+        Binding(get: { model.settings.hueBridgeIP ?? "" },
+                set: { v in
+                    let t = v.trimmingCharacters(in: .whitespacesAndNewlines)
+                    model.settings.hueBridgeIP = t.isEmpty ? nil : t
+                    pairNote = nil
+                })
+    }
+
+    private func find() {
+        finding = true
+        Task {
+            var list: [(ip: String, name: String)] = []
+            for ip in await model.findHueBridges() {
+                list.append((ip, await model.hueBridgeName(ip: ip) ?? "hue bridge"))
+            }
+            found = list
+            if list.count == 1, model.settings.hueBridgeIP == nil { model.settings.hueBridgeIP = list[0].ip }
+            pairNote = list.isEmpty ? "no bridge found · type its address" : nil
+            finding = false
+        }
+    }
+
+    private func pair() {
+        guard let ip = model.settings.hueBridgeIP else { return }
+        pairing = true
+        Task {
+            switch await model.pairHue(ip: ip) {
+            case .key: pairNote = "paired"
+            case .pressButton: pairNote = "press the round button on the bridge first"
+            case .failed(let why): pairNote = why
+            }
+            pairing = false
+        }
+    }
+
+    private func load() {
+        loading = true
+        Task {
+            targets = await model.listHueTargets()
+            if targets.isEmpty { pairNote = "no lights found · pair again" }
             loading = false
         }
     }

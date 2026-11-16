@@ -42,7 +42,8 @@ the tv. no app to open, nothing to tap.
 
 - a mac with **macos 13** or later.
 - any of these, you don't need all three:
-  - **lamp**: a govee h6076 on your wi-fi, with *lan control* switched on in govee home › lamp › settings.
+  - **lamp**: **philips hue** (any hue light or room, through the hue bridge), or a **govee** light on your
+    wi-fi with *lan control* switched on in govee home › lamp › settings.
   - **speaker**: an ultimate ears boom 3.
   - **tv**: a samsung tv in your smartthings account.
 - for the automatic part: an **iphone** (shortcuts) or **android** phone (tasker, macrodroid…).
@@ -102,7 +103,9 @@ press **send test signal**. when arriq says *heard from phone*, you're linked.
 
 open the **devices** tab and pick a device.
 
-- **lamp**: nothing to set up. arriq finds it on your wi-fi.
+- **lamp · philips hue**: choose **hue**, press **find** (or type the bridge's address), press the round button
+  on top of the bridge, then **pair** within 30 seconds. press **pick your light** and choose a room or a single light.
+- **lamp · govee**: nothing to set up. arriq finds it on your wi-fi.
 - **speaker**: paste its bluetooth address (system settings › bluetooth › ⓘ next to the speaker).
 - **tv**: create a [smartthings personal access token](https://account.smartthings.com/tokens), paste it, press **save**,
   then **pick your tv**. new tokens last 24 hours; if the tv says *token expired*, paste a fresh one.
@@ -122,9 +125,10 @@ press **turn on** on each one to try it.
 ## privacy
 
 your phone never shares where you are. it only sends the word `arrived` or `left`. arriq knows the mac is home by
-looking at which router it's connected to, which needs no location permission. your smartthings token stays in the
-macos keychain and is never written to a file or the log. nothing leaves your mac except the messages to your lamp,
-speaker, smartthings and your private ntfy.sh address.
+looking at which router it's connected to, which needs no location permission. your smartthings token and your hue
+bridge key stay in the macos keychain and are never written to a file or the log. the hue bridge is found on your
+own network, without asking philips' cloud. nothing leaves your mac except the messages to your lamp or
+hue bridge, speaker, smartthings and your private ntfy.sh address.
 
 ## build from source
 

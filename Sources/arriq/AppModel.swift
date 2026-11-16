@@ -183,6 +183,10 @@ final class AppModel: ObservableObject {
     }
 
     func setSmartThingsToken(_ token: String) { engine.setSmartThingsToken(token) }
+    func findHueBridges() async -> [String] { await engine.findHueBridges() }
+    func hueBridgeName(ip: String) async -> String? { await engine.hueBridgeName(ip: ip) }
+    func pairHue(ip: String) async -> HuePair { await engine.pairHue(ip: ip) }
+    func listHueTargets() async -> [HueTarget] { await engine.listHueTargets() }
     func listSmartThingsDevices() async -> [SmartThingsDevice] { await engine.listSmartThingsDevices() }
     var phoneURL: String { engine.phoneURL(for: settings) }
 
